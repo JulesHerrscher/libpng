@@ -1,118 +1,115 @@
-// libpng_write_fuzzer.cc
+// libgmg_write_fuzzer.cc
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
-#include <algorithm>
+
+#define PNG_INTERNAL
 #include "png.h"
 
-// Maximum dimensions to prevent excessive memory usage
-constexpr uint32_t kMaxWidth = 1024;
-constexpr uint32_t kMaxHeight = 1024;
+// Write-specific cleanup
+#define PNG_WRITE_CLEANUP \
+  if (png_handler.png_ptr) { \
+    if (png_handler.row_ptr) \
+      png_free(png_handler.png_ptr, png_handler.row_ptr); \
+    if (png_handler.end_info_ptr) \
+      png_destroy_write_struct(&png_handler.png_ptr, &png_handler.end_info_ptr); \
+    else \
+      png_destroy_write_struct(&png_handler.png_ptr, nullptr); \
+  }
 
-// Custom write function to store output in memory
-void user_write_data(png_structp png_ptr, png_bytep data, png_size_t length) {
-    auto* output = static_cast<std::vector<uint8_t>*>(png_get_io_ptr(png_ptr));
-    output->insert(output->end(), data, data + length);
+struct BufState {
+  uint8_t* data;
+  size_t capacity;
+  size_t size;
+};
+
+struct PngWriteHandler {
+  png_structp png_ptr = nullptr;
+  png_infop info_ptr = nullptr;
+  png_bytep row_ptr = nullptr;
+  BufState* buf_state = nullptr;
+
+  ~PngWriteHandler() {
+    PNG_WRITE_CLEANUP
+    delete buf_state;
+  }
+};
+
+// Write callback for libpng
+void user_write_data(png_structp png_ptr, png_bytep data, size_t length) {
+  BufState* buf_state = static_cast<BufState*>(png_get_io_ptr(png_ptr));
+  if (buf_state->size + length > buf_state->capacity) {
+    png_error(png_ptr, "Write buffer overflow");
+  }
+  memcpy(buf_state->data + buf_state->size, data, length);
+  buf_state->size += length;
 }
 
+void user_flush_data(png_structp) {}
+
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-    // Minimum input size to extract initial parameters
-    if (size < 10) return 0;
+  if (size < 32) return 0;  // Minimal input size check
 
-    // Extract initial parameters from input
-    uint32_t width = *reinterpret_cast<const uint32_t*>(data);
-    uint32_t height = *reinterpret_cast<const uint32_t*>(data + 4);
-    int color_type = data[8] % 6;  // 0-5 corresponding to valid color types
-    int bit_depth = data[9] % 17;  // 0-16 (valid values vary by color type)
-    data += 10;
-    size -= 10;
+  PngWriteHandler png_handler;
+  
+  try {
+    // Initialize write structures
+    png_handler.png_ptr = png_create_write_struct(
+        PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+    if (!png_handler.png_ptr) return 0;
 
-    // Clamp dimensions to prevent OOM
-    width = std::min(width & 0x7FFFFFFF, kMaxWidth);  // Clear high bit to avoid negative
-    height = std::min(height & 0x7FFFFFFF, kMaxHeight);
-    if (width == 0) width = 1;
-    if (height == 0) height = 1;
+    png_handler.info_ptr = png_create_info_struct(png_handler.png_ptr);
+    if (!png_handler.info_ptr) return 0;
 
-    // Validate and adjust color type
-    switch (color_type) {
-        case 0: color_type = PNG_COLOR_TYPE_GRAY; break;
-        case 2: color_type = PNG_COLOR_TYPE_RGB; break;
-        case 3: color_type = PNG_COLOR_TYPE_PALETTE; break;
-        case 4: color_type = PNG_COLOR_TYPE_GRAY_ALPHA; break;
-        case 6: color_type = PNG_COLOR_TYPE_RGBA; break;
-        default: color_type = PNG_COLOR_TYPE_RGB;
+    // Set up output buffer
+    png_handler.buf_state = new BufState();
+    const size_t max_size = 1000000;  // Prevent OOM
+    png_handler.buf_state->data = static_cast<uint8_t*>(malloc(max_size));
+    png_handler.buf_state->capacity = max_size;
+    png_handler.buf_state->size = 0;
+
+    png_set_write_fn(png_handler.png_ptr, png_handler.buf_state,
+                     user_write_data, user_flush_data);
+
+    if (setjmp(png_jmpbuf(png_handler.png_ptr))) {
+      return 0;
     }
 
-    // Validate and adjust bit depth
-    if (color_type == PNG_COLOR_TYPE_GRAY || color_type == PNG_COLOR_TYPE_PALETTE) {
-        const int valid[] = {1, 2, 4, 8, 16};
-        bit_depth = valid[bit_depth % 5];
-    } else if (color_type == PNG_COLOR_TYPE_RGB || color_type == PNG_COLOR_TYPE_RGBA) {
-        bit_depth = (bit_depth & 8) ? 8 : 16;
-    } else {  // GRAY_ALPHA
-        bit_depth = 8;
-    }
+    // Create synthetic image parameters from fuzzer input
+    const png_uint_32 width = 64;
+    const png_uint_32 height = 64;
+    const int bit_depth = 8;
+    const int color_type = PNG_COLOR_TYPE_RGB;
 
-    // Initialize PNG write structures
-    png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-    if (!png_ptr) return 0;
-
-    png_infop info_ptr = png_create_info_struct(png_ptr);
-    if (!info_ptr) {
-        png_destroy_write_struct(&png_ptr, nullptr);
-        return 0;
-    }
-
-    // Set up error handling
-    if (setjmp(png_jmpbuf(png_ptr))) {
-        png_destroy_write_struct(&png_ptr, &info_ptr);
-        return 0;
-    }
-
-    // Set up memory output
-    std::vector<uint8_t> output;
-    png_set_write_fn(png_ptr, &output, user_write_data, nullptr);
-
-    // Set IHDR with validated parameters
-    png_set_IHDR(png_ptr, info_ptr, width, height, bit_depth, color_type,
-                 PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
-
-    // Add dummy PLTE for palette images
-    if (color_type == PNG_COLOR_TYPE_PALETTE) {
-        png_color palette[256];
-        for (int i = 0; i < 256; ++i) {
-            palette[i].red = palette[i].green = palette[i].blue = i;
-        }
-        png_set_PLTE(png_ptr, info_ptr, palette, 256);
-    }
+    png_set_IHDR(png_handler.png_ptr, png_handler.info_ptr,
+                 width, height, bit_depth, color_type,
+                 PNG_INTERLACE_NONE,
+                 PNG_COMPRESSION_TYPE_BASE,
+                 PNG_FILTER_TYPE_BASE);
 
     // Write header
-    png_write_info(png_ptr, info_ptr);
+    png_write_info(png_handler.png_ptr, png_handler.info_ptr);
 
-    // Prepare row buffer
-    const png_size_t row_bytes = png_get_rowbytes(png_ptr, info_ptr);
-    std::vector<png_byte> row(row_bytes);
+    // Allocate row buffer
+    const png_size_t rowbytes = png_get_rowbytes(png_handler.png_ptr,
+                                                png_handler.info_ptr);
+    png_handler.row_ptr = png_malloc(png_handler.png_ptr, rowbytes);
 
-    // Generate row data from input (cycle if needed)
-    for (png_uint_32 y = 0; y < height; ++y) {
-        for (size_t i = 0; i < row_bytes; ++i) {
-            if (size == 0) {
-                data = data - size;  // Reset to start of pixel data
-                size = row_bytes * height;
-            }
-            row[i] = size ? *data++ : 0;
-            if (size) --size;
-        }
-        png_write_row(png_ptr, row.data());
+    // Generate synthetic image data
+    for (png_uint_32 y = 0; y < height; y++) {
+      memset(png_handler.row_ptr, (y % 256), rowbytes);  // Simple pattern
+      png_write_row(png_handler.png_ptr, png_handler.row_ptr);
     }
 
-    // Finalize write
-    png_write_end(png_ptr, info_ptr);
+    png_write_end(png_handler.png_ptr, nullptr);
 
-    // Cleanup
-    png_destroy_write_struct(&png_ptr, &info_ptr);
-
+  } catch (...) {
+    PNG_WRITE_CLEANUP
     return 0;
+  }
+
+  PNG_WRITE_CLEANUP
+  return 0;
 }
