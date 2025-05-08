@@ -14,7 +14,7 @@
     if (png_handler.row_ptr) \
       png_free(png_handler.png_ptr, png_handler.row_ptr); \
     if (png_handler.end_info_ptr) \
-      png_destroy_write_struct(&png_handler.png_ptr, &png_handler.end_info_ptr); \
+      png_destroy_write_struct(&png_handler.png_ptr, &png_handler.info_ptr); \
     else \
       png_destroy_write_struct(&png_handler.png_ptr, nullptr); \
   }
@@ -99,7 +99,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
     // Generate synthetic image data
     for (png_uint_32 y = 0; y < height; y++) {
-      memset(png_handler.row_ptr, (y % 256), rowbytes);  // Simple pattern
+      memset(png_handler.row_ptr, data[y % size], rowbytes); 
       png_write_row(png_handler.png_ptr, png_handler.row_ptr);
     }
 
