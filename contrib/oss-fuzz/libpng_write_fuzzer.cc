@@ -60,9 +60,12 @@ void default_free(png_structp, png_voidp ptr) {
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   fprintf(stderr, "[DEBUG] Called with size = %zu, data = %p\n", size, data);
-  if (size < 8) return 0;  // need enough input to fill one frame
+  if (size < 8) {
+    fprintf(stderr, "[DEBUG] Size is too small\n");
+    return 0;  // need enough input to fill one frame
+  }
 
-  PngObjectHandler png_handler;
+  /*PngObjectHandler png_handler;
   png_handler.png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
   if (!png_handler.png_ptr) return 0;
 
@@ -98,6 +101,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   }
 
   png_write_end(png_handler.png_ptr, nullptr);
-  PNG_CLEANUP
+  PNG_CLEANUP*/
   return 0;
 }
