@@ -59,16 +59,11 @@ void default_free(png_structp, png_voidp ptr) {
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-  fprintf(stderr, "[DEBUG] Fuzzer input size: %zu\n", size);
-  if (size < 8) {
-    return 0;
-  }
+  if (size < 8) return 0;  // need enough input to fill one frame
 
   PngObjectHandler png_handler;
   png_handler.png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-  if (!png_handler.png_ptr) {
-    return 0;
-  }
+  if (!png_handler.png_ptr) return 0;
 
   png_handler.info_ptr = png_create_info_struct(png_handler.png_ptr);
   if (!png_handler.info_ptr) {
@@ -84,26 +79,24 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     return 0;
   }
 
-  // Set image properties
   png_uint_32 width = 100;
   png_uint_32 height = 100;
   int bit_depth = 8;
   int color_type = PNG_COLOR_TYPE_RGBA;
+
   png_set_IHDR(png_handler.png_ptr, png_handler.info_ptr, width, height,
                bit_depth, color_type, PNG_INTERLACE_NONE,
                PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
   png_write_info(png_handler.png_ptr, png_handler.info_ptr);
 
-  // Write image data
-  std::vector<png_byte> row(width * 4, 255); // Example: white RGBA rows
+  const uint8_t* ptr = data;
   for (png_uint_32 y = 0; y < height; ++y) {
-    png_write_row(png_handler.png_ptr, row.data());
+    png_write_row(png_handler.png_ptr, const_cast<png_bytep>(ptr));
+    ptr += width * 4;
   }
 
   png_write_end(png_handler.png_ptr, nullptr);
-
   PNG_CLEANUP
-
   return 0;
 }
