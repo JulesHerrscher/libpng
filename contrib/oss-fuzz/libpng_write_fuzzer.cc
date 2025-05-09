@@ -59,6 +59,7 @@ void default_free(png_structp, png_voidp ptr) {
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+  fprintf(stderr, "[DEBUG] Fuzzer input size: %zu\n", size);
   if (size < 8) {
     return 0;
   }
