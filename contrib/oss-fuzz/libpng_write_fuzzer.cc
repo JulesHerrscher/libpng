@@ -34,7 +34,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   // Use only as much input as needed
   const uint8_t* pixel_ptr = data;
 
-  /*png_structp png_ptr = nullptr;
+  png_structp png_ptr = nullptr;
   png_infop info_ptr = nullptr;
 
   BufState buf;
@@ -53,7 +53,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   if (setjmp(png_jmpbuf(png_ptr))) {
     png_destroy_write_struct(&png_ptr, &info_ptr);
     return 0;
-  }*/
+  }
 
   return 0;
 }
