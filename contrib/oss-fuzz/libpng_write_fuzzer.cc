@@ -44,6 +44,11 @@ void user_write_data(png_structp png_ptr, png_bytep data, size_t length) {
   buf_state->buffer.insert(buf_state->buffer.end(), data, data + length);
 }
 
+// Custom flush callback: no-op for this example
+void user_flush_data(png_structp png_ptr) {
+  // No-op for this example.
+}
+
 void* limited_malloc(png_structp, png_alloc_size_t size) {
   if (size > 8000000)
     return nullptr;
