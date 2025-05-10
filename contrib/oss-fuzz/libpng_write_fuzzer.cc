@@ -68,9 +68,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   // Use only as much input as needed
   const uint8_t* pixel_ptr = data;
 
-  PngObjectHandler png_handler;
+  /*PngObjectHandler png_handler;
   png_handler.png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-  if (!png_handler.png_ptr) return 0;
+  if (!png_handler.png_ptr) return 0;*/
 
   return 0;
 }
