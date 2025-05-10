@@ -19,7 +19,7 @@
   }
 
 struct BufState {
-  const uint8_t* buffer;
+  std::vector<uint8_t> buffer; 
 };
 
 struct PngObjectHandler {
