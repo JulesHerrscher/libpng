@@ -59,7 +59,7 @@ void* limited_malloc(png_structp, png_alloc_size_t size) {
   return malloc(size);
 }
 
-void defualt_free(png_structp, png_voidp ptr) {
+void default_free(png_structp, png_voidp ptr) {
   return free(ptr);
 }
 
