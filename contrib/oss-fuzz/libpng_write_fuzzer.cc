@@ -28,8 +28,7 @@
   }
 
 struct BufState {
-  uint8_t* data;
-  size_t bytes_left;
+  std::vector<uint8_t> buffer;
 };
 
 struct PngObjectHandler {
@@ -52,47 +51,26 @@ struct PngObjectHandler {
   }
 };
 
-void* limited_malloc(png_structp, png_alloc_size_t size) {
-  if (size > 8000000)
-    return nullptr;
-
-  return malloc(size);
-}
-
-void default_free(png_structp, png_voidp ptr) {
-  return free(ptr);
+void user_write_data(png_structp png_ptr, png_bytep data, size_t length) {
+  BufState* buf_state = static_cast<BufState*>(png_get_io_ptr(png_ptr));
+  buf_state->buffer.insert(buf_state->buffer.end(), data, data + length);
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
- if (size < 8) {
-    return 0;
-  }
+  constexpr int width = 100;
+  constexpr int height = 100;
+  constexpr int channels = 4; 
+  constexpr size_t row_size = width * channels;
+  constexpr size_t total_bytes = row_size * height;
+
+  if (size < total_bytes) return 0;
+
+  // Use only as much input as needed
+  const uint8_t* pixel_ptr = data;
 
   PngObjectHandler png_handler;
-  png_handler.png_ptr = nullptr;
-  png_handler.row_ptr = nullptr;
-  png_handler.info_ptr = nullptr;
-  png_handler.end_info_ptr = nullptr;
+  png_handler.png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+  if (!png_handler.png_ptr) return 0;
 
-  png_handler.png_ptr = png_create_read_struct
-    (PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-  if (!png_handler.png_ptr) {
-    return 0;
-  }
-
-  png_handler.info_ptr = png_create_info_struct(png_handler.png_ptr);
-  if (!png_handler.info_ptr) {
-    PNG_CLEANUP
-    return 0;
-  }
-
-  png_handler.end_info_ptr = png_create_info_struct(png_handler.png_ptr);
-  if (!png_handler.end_info_ptr) {
-    PNG_CLEANUP
-    return 0;
-  }
-
-  png_set_mem_fn(png_handler.png_ptr, nullptr, limited_malloc, default_free);
-
-  return 0;
+  return o;
 }
