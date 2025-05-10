@@ -44,7 +44,7 @@ void user_write_data(png_structp png_ptr, png_bytep data, size_t length) {
   buf_state->buffer.insert(buf_state->buffer.end(), data, data + length);
 }
 
-void user_flush_data(png_structp png_ptr) {.
+void user_flush_data(png_structp png_ptr) {
 }
 
 void* limited_malloc(png_structp, png_alloc_size_t size) {
