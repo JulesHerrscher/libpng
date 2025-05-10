@@ -9,22 +9,13 @@
 #include "png.h"
 
 #define PNG_CLEANUP \
-  if(png_handler.png_ptr) \
-  { \
-    if (png_handler.row_ptr) \
-      png_free(png_handler.png_ptr, png_handler.row_ptr); \
-    if (png_handler.end_info_ptr) \
-      png_destroy_read_struct(&png_handler.png_ptr, &png_handler.info_ptr,\
-        &png_handler.end_info_ptr); \
-    else if (png_handler.info_ptr) \
-      png_destroy_read_struct(&png_handler.png_ptr, &png_handler.info_ptr,\
-        nullptr); \
+  if (png_handler.png_ptr) { \
+    if (png_handler.info_ptr) \
+      png_destroy_write_struct(&png_handler.png_ptr, &png_handler.info_ptr); \
     else \
-      png_destroy_read_struct(&png_handler.png_ptr, nullptr, nullptr); \
+      png_destroy_write_struct(&png_handler.png_ptr, nullptr); \
     png_handler.png_ptr = nullptr; \
-    png_handler.row_ptr = nullptr; \
     png_handler.info_ptr = nullptr; \
-    png_handler.end_info_ptr = nullptr; \
   }
 
 struct BufState {
@@ -32,28 +23,29 @@ struct BufState {
 };
 
 struct PngObjectHandler {
-  png_infop info_ptr = nullptr;
   png_structp png_ptr = nullptr;
-  png_infop end_info_ptr = nullptr;
-  png_voidp row_ptr = nullptr;
+  png_infop info_ptr = nullptr;
   BufState* buf_state = nullptr;
 
   ~PngObjectHandler() {
-    if (row_ptr)
-      png_free(png_ptr, row_ptr);
-    if (end_info_ptr)
-      png_destroy_read_struct(&png_ptr, &info_ptr, &end_info_ptr);
-    else if (info_ptr)
-      png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
-    else
-      png_destroy_read_struct(&png_ptr, nullptr, nullptr);
+    if (png_ptr) {
+      if (info_ptr)
+        png_destroy_write_struct(&png_ptr, &info_ptr);
+      else
+        png_destroy_write_struct(&png_ptr, nullptr);
+    }
     delete buf_state;
   }
 };
 
+
 void user_write_data(png_structp png_ptr, png_bytep data, size_t length) {
   BufState* buf_state = static_cast<BufState*>(png_get_io_ptr(png_ptr));
   buf_state->buffer.insert(buf_state->buffer.end(), data, data + length);
+}
+
+void user_flush_data(png_structp /*png_ptr*/) {
+  // No-op
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
@@ -68,11 +60,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   // Use only as much input as needed
   const uint8_t* pixel_ptr = data;
 
-  PngObjectHandler png_handler;
-  png_handler.png_ptr = nullptr;
-  png_handler.row_ptr = nullptr;
-  png_handler.info_ptr = nullptr;
-  png_handler.end_info_ptr = nullptr;
+  //PngObjectHandler png_handler;
 
   /*png_handler.png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
   if (!png_handler.png_ptr) return 0;*/
