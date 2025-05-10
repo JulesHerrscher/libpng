@@ -18,7 +18,7 @@
 # Revisions by Glenn Randers-Pehrson, 2017:
 # 1. Build only the library, not the tools (changed "make -j$(nproc) all" to
 #     "make -j$(nproc) libpng16.la").
-# 2. Disabled WARNING and WRITE options in pnglibconf.dfa.
+# 2. Disabled WARNING option in pnglibconf.dfa.
 # 3. Build zlib alongside libpng
 ################################################################################
 
@@ -26,6 +26,7 @@
 cat scripts/pnglibconf.dfa | \
   sed -e "s/option STDIO/option STDIO disabled/" \
       -e "s/option WARNING /option WARNING disabled/" \
+      -e "s/option WRITE disabled/option WRITE enables WRITE_INT_FUNCTIONS/" \
 > scripts/pnglibconf.dfa.temp
 mv scripts/pnglibconf.dfa.temp scripts/pnglibconf.dfa
 
