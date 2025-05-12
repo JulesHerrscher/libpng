@@ -49,8 +49,8 @@ $CXX $CXXFLAGS -std=c++11 -I. \
      -lFuzzingEngine .libs/libpng16.a -lz
 
 # add seed corpus.
-find $SRC/libpng -name "*.png" | grep -v crashers | \
-     xargs zip $OUT/libpng_read_fuzzer_seed_corpus.zip
+#find $SRC/libpng -name "*.png" | grep -v crashers | \
+#     xargs zip $OUT/libpng_read_fuzzer_seed_corpus.zip
 
 # add the same seed corpus for the write fuzzer.
 find $SRC/libpng -name "*.png" | grep -v crashers | \
